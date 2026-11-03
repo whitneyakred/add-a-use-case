@@ -1533,6 +1533,7 @@ Details:
 
 **Associated Information:**
 - The course admin or instructor shall be able to cancel the use case at any time prior to submitting it.
+- Constraint from UC-STU-deactivate-student: deactivation never removed the student from her team (BR-deactivation-keeps-team), so reactivation makes no team change. If a course admin removed her from her team while she was inactive, reactivation does not restore that membership; she returns with no team until a course admin assigns her (BR-team-admin-only). Once active again she owes weekly activity reports and peer evaluations, and her teammates owe evaluations of her, from that point on (BR-submission-owed).
 
 **Related Use Cases:** UC-STU-delete-student: Delete a student; UC-STU-deactivate-student: Deactivate a student
 **Assumptions:**
