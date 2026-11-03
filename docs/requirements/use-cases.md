@@ -1473,6 +1473,16 @@ Details:
 7. Use case ends.
 
 **Extensions:**
+- **3a. The student is already deactivated:**
+  - 3a1. The system alerts the course admin or instructor that this student is already deactivated, and leaves her account unchanged.
+  - 3a2. Use case ends.
+- **3b. The course admin or instructor may not deactivate this student** (she is neither the course admin of the student's course nor an instructor assigned to the student's course section, per BR-student-lifecycle):
+  - 3b1. The system refuses the deactivation, alerts her that she is not authorized to deactivate this student and that the course admin of the student's course can, and leaves the student's account unchanged.
+  - 3b2. Use case ends.
+- **5a. The course admin or instructor cancels the deactivation at the warning:**
+  - 5a1. The system leaves the student's account and team membership unchanged; she remains an active student of her course section.
+  - 5a2. Use case ends.
+
 **Priority:** Low
 **Frequency of Use:** Rare. Occurs occasionally when a student withdraws from a course section.
 **Business Rules:** BR-student-lifecycle
