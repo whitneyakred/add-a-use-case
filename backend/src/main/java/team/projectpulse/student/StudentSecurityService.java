@@ -47,4 +47,28 @@ public class StudentSecurityService {
                 .anyMatch(instructor -> instructor.getId().equals(instructorIdFromJwt));
     }
 
+    /**
+     * Whether the caller may deactivate or reactivate this student (BR-student-lifecycle): the course admin of the
+     * student's course, or an instructor assigned to the student's course section.
+     *
+     * <p>{@link #isCurrentUserInstructorOfStudentSection} alone is not enough: it reads only the course section's
+     * instructors, so a course admin who is not assigned to that particular course section would be refused.
+     */
+    public boolean isCurrentUserLifecycleManagerOfStudent(Integer studentId) {
+        Integer callerId = this.userUtils.getUserId();
+        if (callerId == null) {
+            return false;
+        }
+        Student student = this.studentRepository.findById(studentId).orElse(null);
+        if (student == null) {
+            return false;
+        }
+        boolean isCourseAdmin = student.getSection().getCourse() != null
+                && student.getSection().getCourse().getCourseAdmin() != null
+                && callerId.equals(student.getSection().getCourse().getCourseAdmin().getId());
+        boolean isSectionInstructor = student.getSection().getInstructors().stream()
+                .anyMatch(instructor -> callerId.equals(instructor.getId()));
+        return isCourseAdmin || isSectionInstructor;
+    }
+
 }

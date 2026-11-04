@@ -209,19 +209,23 @@ async function prepareStartingPeerEvaluations() {
   } else {
     // If not, create a new set of evaluations
     isNewSubmission = true
-    peerEvalutions.value = students.value.map((student) => ({
-      week: previousWeek.value,
-      evaluatorId: (userInfoStore.userInfo as Student).id as number,
-      evaluateeId: student.id as number,
-      evaluateeName: `${student.firstName} ${student.lastName}`,
-      ratings: criteria.value.map((criterion) => ({
-        criterionId: criterion.criterionId as number,
-        criterion: criterion.criterion,
-        actualScore: 10 // Default score, can be changed by the user
-      })),
-      publicComment: '',
-      privateComment: ''
-    }))
+    // A deactivated teammate cannot be newly evaluated (BR-evaluation-active-evaluatee), so she gets no new card.
+    // Evaluations of her saved before she was deactivated still load above and stay editable.
+    peerEvalutions.value = students.value
+      .filter((student) => student.enabled !== false)
+      .map((student) => ({
+        week: previousWeek.value,
+        evaluatorId: (userInfoStore.userInfo as Student).id as number,
+        evaluateeId: student.id as number,
+        evaluateeName: `${student.firstName} ${student.lastName}`,
+        ratings: criteria.value.map((criterion) => ({
+          criterionId: criterion.criterionId as number,
+          criterion: criterion.criterion,
+          actualScore: 10 // Default score, can be changed by the user
+        })),
+        publicComment: '',
+        privateComment: ''
+      }))
   }
 }
 

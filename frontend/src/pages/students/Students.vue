@@ -39,7 +39,7 @@
           <el-tag type="danger" v-else>Disabled</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="Operations" width="120">
+      <el-table-column label="Operations" width="210">
         <template #default="{ row }">
           <el-button
             icon="Edit"
@@ -48,6 +48,14 @@
             type="primary"
             @click.stop="showEditStudentDialog(row)"
           ></el-button>
+          <el-button
+            v-if="row.enabled"
+            plain
+            type="danger"
+            size="small"
+            @click.stop="confirmDeactivateStudent(row)"
+            >Deactivate</el-button
+          >
         </template>
       </el-table-column>
       <template #empty>
@@ -78,7 +86,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { searchStudents } from '@/apis/student'
+import { deactivateStudent, searchStudents } from '@/apis/student'
 import type {
   SearchStudentByCriteriaResponse,
   Student,
@@ -86,7 +94,8 @@ import type {
 } from '@/apis/student/types'
 import { useSettingsStore } from '@/stores/settings'
 import EditStudentForm from './EditStudentForm.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
 
 const searchCriteria = ref<StudentSearchCriteria>({
   sectionId: NaN,
@@ -157,6 +166,61 @@ const studentBeingEditedId = ref<number>() // ID of the artifact being edited, i
 function showEditStudentDialog(student: Student) {
   dialogVisible.value = true
   studentBeingEditedId.value = student.id as number
+}
+
+// A student sets her own name, so it must not be read as HTML inside the warning
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// UC-STU-deactivate-student steps 3-6. The warning states the consequences listed in the use case's Associated
+// Information; cancelling it (extension 5a) sends nothing.
+async function confirmDeactivateStudent(student: Student) {
+  const name = `${student.firstName} ${student.lastName}`
+  try {
+    await ElMessageBox.confirm(
+      `<p>Deactivate <strong>${escapeHtml(name)}</strong>?</p>
+       <ul style="padding-left: 18px; margin: 8px 0 0">
+         <li>She can no longer log in, and a session she already has ends on her next request.</li>
+         <li>She stays on her team as an inactive member. She gets no reminders and owes no reports or peer evaluations, and her teammates no longer owe one of her.</li>
+         <li>No new peer evaluation of her can be submitted. Evaluations already submitted stay on record, and the peer evaluation report lists her only for the weeks she was evaluated.</li>
+         <li>Her account and submitted work are kept, and she can be reactivated later. This is not a delete.</li>
+       </ul>`,
+      'Deactivate a student',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: 'Deactivate',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return // Extension 5a: cancelled, nothing changes
+  }
+
+  try {
+    await deactivateStudent(student.id as number)
+    ElMessage.success(`${name} has been deactivated.`)
+    loadStudents()
+  } catch (error) {
+    // Extension 3b. The shared request interceptor has already toasted and routed to the forbidden page; the use
+    // case also asks to say who can do this instead.
+    if (axios.isAxiosError(error) && error.response?.status === 403) {
+      ElMessageBox.alert(
+        `You are not authorized to deactivate ${name}. Please contact the course admin of this student's course.`,
+        'Not authorized',
+        { type: 'error' }
+      )
+    }
+    // Extension 3a (409, already deactivated) is shown by the interceptor's toast with the server's message.
+    // Reload so a row that was already deactivated elsewhere stops offering the button.
+    loadStudents()
+  }
 }
 
 function closeDialog() {

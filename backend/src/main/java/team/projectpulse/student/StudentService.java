@@ -4,6 +4,7 @@ import team.projectpulse.section.Section;
 import team.projectpulse.section.SectionRepository;
 import team.projectpulse.system.UserUtils;
 import team.projectpulse.system.exception.ObjectNotFoundException;
+import team.projectpulse.system.exception.StudentAlreadyDeactivatedException;
 import team.projectpulse.user.userinvitation.UserInvitationService;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
@@ -116,13 +117,33 @@ public class StudentService {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        // If the user is an admin, then the user can update all the fields
-        if (authentication.getAuthorities().stream().anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_instructor"))) {
-            oldStudent.setEnabled(update.isEnabled());
+        // An instructor may turn an inactive account back on here, which is the only reactivation path until
+        // UC-STU-reactivate-student is built. Turning an account off goes only through deactivateStudent, so the
+        // warning and confirmation of UC-STU-deactivate-student cannot be skipped.
+        if (authentication.getAuthorities().stream().anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_instructor"))
+                && update.isEnabled()) {
+            oldStudent.setEnabled(true);
 //            oldStudent.setRoles(update.getRoles());
         }
 
         return this.studentRepository.save(oldStudent);
+    }
+
+    /**
+     * UC-STU-deactivate-student step 6: deactivates the student's account. Her team membership, weekly activity
+     * reports, and peer evaluations are left as they are (BR-deactivation-keeps-team, BR-student-lifecycle).
+     * Who may call this is decided by the route rule (BR-student-lifecycle), not here.
+     *
+     * @throws StudentAlreadyDeactivatedException extension 3a: the account is already inactive
+     */
+    public Student deactivateStudent(Integer studentId) {
+        Student student = this.studentRepository.findById(studentId)
+                .orElseThrow(() -> new ObjectNotFoundException("student", studentId));
+        if (!student.isEnabled()) {
+            throw new StudentAlreadyDeactivatedException(student.getFirstName() + " " + student.getLastName());
+        }
+        student.setEnabled(false);
+        return this.studentRepository.save(student);
     }
 
     public void deleteStudent(Integer studentId) {
