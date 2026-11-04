@@ -5,6 +5,7 @@ import team.projectpulse.instructor.Instructor;
 import team.projectpulse.section.Section;
 import team.projectpulse.section.SectionRepository;
 import team.projectpulse.system.UserUtils;
+import team.projectpulse.system.exception.StudentAlreadyDeactivatedException;
 import team.projectpulse.user.MyUserPrincipal;
 import team.projectpulse.user.userinvitation.UserInvitationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -174,7 +175,67 @@ class StudentServiceTest {
         assertThat(result.getLastName()).isEqualTo(update.getLastName());
         assertThat(result.getEmail()).isEqualTo(update.getEmail());
 //        assertThat(result.getRoles()).isEqualTo(update.getRoles());
-        assertThat(result.isEnabled()).isEqualTo(update.isEnabled());
+        // The update asks for enabled = false, but the generic edit may not deactivate: that goes only through the
+        // confirmed UC-STU-deactivate-student flow (design stu.md, test-list row T12)
+        assertThat(result.isEnabled()).isTrue();
+    }
+
+    @Test
+    void testInstructorReactivatesStudentThroughEdit() {
+        // Given: an inactive student; the generic edit stays the reactivation path until UC-STU-reactivate-student
+        Student inactive = this.students.get(0);
+        inactive.setEnabled(false);
+        Student update = new Student("john", "John", "Smith", "j.smith@abc.edu", "", true, "student");
+        given(this.studentRepository.findById(1)).willReturn(Optional.of(inactive));
+        given(this.studentRepository.save(any(Student.class))).willAnswer(invocation -> invocation.getArgument(0));
+        setInstructorContext();
+
+        // When
+        Student result = this.studentService.updateStudent(1, update);
+
+        // Then
+        assertThat(result.isEnabled()).isTrue();
+    }
+
+    @Test
+    void testDeactivateStudent() {
+        // Given: UC-STU-deactivate-student main success scenario, step 6
+        Student john = this.students.get(0);
+        given(this.studentRepository.findById(1)).willReturn(Optional.of(john));
+        given(this.studentRepository.save(john)).willReturn(john);
+
+        // When
+        Student result = this.studentService.deactivateStudent(1);
+
+        // Then
+        assertThat(result.isEnabled()).isFalse();
+        verify(this.studentRepository, times(1)).save(john);
+    }
+
+    @Test
+    void testDeactivateStudentAlreadyDeactivated() {
+        // Given: extension 3a
+        Student john = this.students.get(0);
+        john.setEnabled(false);
+        given(this.studentRepository.findById(1)).willReturn(Optional.of(john));
+
+        // When
+        Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> this.studentService.deactivateStudent(1));
+
+        // Then
+        assertThat(thrown).isInstanceOf(StudentAlreadyDeactivatedException.class)
+                .hasMessage("John Smith is already deactivated.");
+        assertThat(john.isEnabled()).isFalse();
+        verify(this.studentRepository, never()).save(any(Student.class));
+    }
+
+    private static void setInstructorContext() {
+        Instructor instructor = new Instructor();
+        instructor.setRoles("instructor");
+        MyUserPrincipal myUserPrincipal = new MyUserPrincipal(instructor);
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(new UsernamePasswordAuthenticationToken(myUserPrincipal, null, myUserPrincipal.getAuthorities()));
+        SecurityContextHolder.setContext(securityContext);
     }
 
     @Test

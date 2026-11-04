@@ -143,6 +143,12 @@ public class ExceptionHandlerAdvice {
         return new Result(false, StatusCode.INVALID_ARGUMENT, ex.getMessage());
     }
 
+    @ExceptionHandler(StudentAlreadyDeactivatedException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Result handleStudentAlreadyDeactivatedException(StudentAlreadyDeactivatedException ex) {
+        return new Result(false, StatusCode.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(PeerEvaluationIllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     Result handleEvaluationRatingIllegalArgumentException(PeerEvaluationIllegalArgumentException ex) {
