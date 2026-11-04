@@ -218,6 +218,8 @@ async function confirmDeactivateStudent(student: Student) {
       )
     }
     // Extension 3a (409, already deactivated) is shown by the interceptor's toast with the server's message.
+    // Reload so a row that was already deactivated elsewhere stops offering the button.
+    loadStudents()
   }
 }
 
