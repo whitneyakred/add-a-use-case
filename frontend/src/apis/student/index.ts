@@ -37,5 +37,9 @@ export const updateStudent = (updatedStudent: Student) =>
     updatedStudent
   )
 
+// UC-STU-deactivate-student: deactivate a student after the instructor confirms the warning
+export const deactivateStudent = (id: number) =>
+  request.put<any, UpdateStudentResponse>(`${API.STUDENTS_ENDPOINT}/${id}/deactivate`)
+
 export const deleteStudent = (id: number) =>
   request.delete<any, DeleteStudentResponse>(`${API.STUDENTS_ENDPOINT}/${id}`)
