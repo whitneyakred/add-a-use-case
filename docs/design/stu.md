@@ -91,7 +91,7 @@ sequenceDiagram
 
 | Method & path | Who may call | Request | Success | Errors |
 |---|---|---|---|---|
-| `PUT /api/v1/students/{studentId}/deactivate` | course admin of the student's course, or an instructor assigned to her course section | no body | 200, the deactivated student | 403 not authorized (3b; the UI tells her to contact the course admin of the student's course) · 409 already deactivated (3a) · 404 no such student |
+| `PUT /api/v1/students/{studentId}/deactivate` | course admin of the student's course, or an instructor assigned to her course section | no body | 200, the deactivated student | 403 not authorized (3b; the UI tells her to contact the course admin of the student's course) · 409 already deactivated (3a) · 403 no such student (the route rule refuses before the service runs, so the response does not reveal which ids exist; see `AuthorizationRuleIntegrationTest`) |
 | `PUT /api/v1/students/{studentId}` (changed) | unchanged | unchanged | unchanged | `enabled: false` on an active student is ignored (the value is not applied); `false → true` still applies |
 | every protected route (changed) | — | — | — | 401 when the token's account is inactive or no longer exists |
 
@@ -102,7 +102,7 @@ sequenceDiagram
 - **Authorization includes the course admin explicitly.** `isCurrentUserInstructorOfStudentSection` checks only `section.instructors`; a course admin not assigned to that course section would be refused, contradicting BR-student-lifecycle. The new check is admin-of-course **or** instructor-of-section.
 - **Team membership untouched** (BR-deactivation-keeps-team). Rejected: removing her from the team, which an instructor may not do (BR-team-admin-only) and which would drop her past weeks from team-scoped records.
 - **Report inclusion keys on evidence, not a date** (BR-evaluation-report-inclusion). Rejected: a `deactivated_at` column (migration, and reactivation must decide what to do with it).
-- **3b message lives in the UI.** The 403 comes from the shared access-denied handler, which stays generic for every route; `Students.vue` maps a 403 from this call to the contact-the-course-admin message.
+- **3b message lives in the UI.** The 403 comes from the shared access-denied handler, which stays generic for every route. The shared `request.ts` interceptor still routes every 403 to the forbidden page; `Students.vue` adds an alert naming the course admin on top of it rather than changing the interceptor for every caller. In practice an instructor only lists her own course section's students, so the UI rarely reaches 3b; the API refusal is what the tests pin.
 
 ## Data model
 
@@ -117,7 +117,7 @@ Reuses the JWT resource-server chain, the deny-by-default route table, `Exceptio
 | # | Flow | Level | Asserts |
 |---|---|---|---|
 | T1 | Main: section instructor deactivates an active student | integration | 200; student `enabled = false`; her team unchanged |
-| T2 | Main: course admin **not** assigned to the course section deactivates | integration | 200 |
+| T2 | Main: course admin **not** assigned to the course section deactivates | unit + integration | 200 |
 | T3 | 3a: student already deactivated | unit + integration | 409; account unchanged |
 | T4 | 3b: instructor of another course section, and a student, try | integration | 403; account unchanged |
 | T5 | 5a: cancel at the warning | **manual** | no request sent; student still active (no frontend test harness is used) |
@@ -126,7 +126,7 @@ Reuses the JWT resource-server chain, the deny-by-default route table, `Exceptio
 | T8 | BR-evaluation-active-evaluatee: new evaluation of an inactive student | unit | rejected, not saved |
 | T9 | BR-evaluation-active-evaluatee: edit of an evaluation of her submitted earlier | unit | saved |
 | T10 | BR-evaluation-report-inclusion | unit | inactive + evaluated that week → listed; inactive + not evaluated → omitted; active + not evaluated → listed |
-| T11 | BR-submission-owed: teammates owe no evaluation of her | unit | teammate who rated only active members is not owing |
+| T11 | BR-submission-owed: teammates owe no evaluation of her | integration | teammate who rated only active members is not owing (already covered before this use case by `SubmissionStatusServiceIntegrationTest.testAnEvaluationOfADeactivatedTeammateIsNotRequired`; no new test) |
 | T12 | Generic edit cannot deactivate | unit | `updateStudent` with `enabled = false` leaves an active student active |
 
 ## Open questions / risks
